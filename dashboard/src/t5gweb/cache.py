@@ -283,6 +283,13 @@ def _get_jira_cards_list(cfg, jira_conn):
             "sprint=" + str(sprint.id) + ' AND labels = "' + cfg["jira_query"] + '"'
         )
         logging.warning("sprint: %s", sprint)
+
+        # Cache the active sprint information for UI to use
+        sprint_data = {
+            'id': sprint.id,
+            'name': sprint.name,
+        }
+        libtelco5g.redis_set("active_sprint", json.dumps(sprint_data))
     else:
         jira_query = (
             "project=" + str(project.id) + ' AND labels = "' + cfg["jira_query"] + '"'

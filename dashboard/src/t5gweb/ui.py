@@ -22,9 +22,13 @@ from flask_login import LoginManager, UserMixin, login_required, login_user
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
 from onelogin.saml2.utils import OneLogin_Saml2_Utils
 
+from t5gweb.database.operations import get_engineering_cases
 from t5gweb.libtelco5g import (
     generate_histogram_stats,
     generate_stats,
+    get_board_id,
+    get_latest_sprint,
+    jira_connection,
     plot_stats,
     redis_get,
     redis_set,
@@ -626,3 +630,147 @@ def get_engineer(engineer):
         engineer_view=True,
         sla_settings=cfg["sla_settings"],
     )
+
+
+@BP.route("/engineering")
+@login_required
+def engineering_view():
+    """Display engineering cases needing attention for current sprint
+
+    Shows cases where the customer has commented after the engineering team,
+    filtered to the currently active sprint. Provides read-only view with
+    expandable rows showing portal and JIRA comments side-by-side.
+
+    Query parameters:
+        engineer: Filter by engineer name (e.g., ?engineer=Adrien Luneau)
+        all_sprints: If "true", show all sprints instead of just current sprint
+        sprint: Specific sprint name to filter by (e.g., ?sprint=T5GFE Sprint 291)
+
+    Returns:
+        str: Rendered HTML template with engineering cases table
+    """
+    cfg = set_cfg()
+
+    # Check for query parameters
+    engineer_filter = request.args.get('engineer')
+    show_all_sprints = request.args.get('all_sprints') == 'true'
+    selected_sprint = request.args.get('sprint')
+
+    from t5gweb.database.session import db_config
+    from t5gweb.database.models import JiraCard
+    from sqlalchemy import func
+
+    session = db_config.SessionLocal()
+    try:
+        # Get list of available sprints for dropdown
+        available_sprints = (
+            session.query(JiraCard.sprint, func.count(JiraCard.jira_card_id))
+            .filter(JiraCard.sprint.isnot(None))
+            .group_by(JiraCard.sprint)
+            .order_by(func.count(JiraCard.jira_card_id).desc())
+            .limit(10)
+            .all()
+        )
+
+        # Get the current sprint (most common one)
+        current_sprint = available_sprints[0][0] if available_sprints else "T5GFE Sprint 291"
+
+        if show_all_sprints or selected_sprint == "all":
+            # Show all sprints
+            normalized_sprint_name = None
+            sprint_display = "All Active Sprints"
+        elif selected_sprint:
+            # User selected a specific sprint
+            normalized_sprint_name = selected_sprint
+            sprint_display = selected_sprint
+        else:
+            # Default to ALL sprints (match Vue behavior)
+            normalized_sprint_name = None
+            sprint_display = "All Active Sprints"
+
+    finally:
+        session.close()
+
+    # Query cases
+    engineering_cases = get_engineering_cases(normalized_sprint_name, engineer_filter)
+
+    return render_template(
+        "ui/engineering.html",
+        cases=engineering_cases,
+        active_sprint=sprint_display,
+        jira_server=cfg["server"],
+        page_title="Engineering View",
+        engineer_filter=engineer_filter,
+        available_sprints=[sprint[0] for sprint in available_sprints],
+        current_sprint=current_sprint,
+        selected_sprint=normalized_sprint_name,
+    )
+
+
+@BP.route("/api/engineering/case/<case_number>/comments")
+@login_required
+def get_case_comments(case_number):
+    """API endpoint to fetch comments for a specific case
+
+    Returns JSON with portal_comments and jira_comments arrays
+    """
+    from t5gweb.database.session import db_config
+    from t5gweb.database.models import Case, Comment, JiraCard, JiraComment
+
+    session = db_config.SessionLocal()
+    try:
+        # Get the case and jira card
+        case = session.query(Case).filter(Case.case_number == case_number).first()
+
+        if not case:
+            return jsonify({"error": "Case not found"}), 404
+
+        # Get portal comments
+        portal_comments = (
+            session.query(Comment)
+            .filter(Comment.case_number == case_number)
+            .order_by(Comment.commented_at.desc())
+            .all()
+        )
+
+        # Get jira card and comments
+        jira_card = (
+            session.query(JiraCard)
+            .filter(JiraCard.case_number == case_number)
+            .first()
+        )
+
+        jira_comments = []
+        if jira_card:
+            jira_comments_query = (
+                session.query(JiraComment)
+                .filter(JiraComment.jira_card_id == jira_card.jira_card_id)
+                .order_by(JiraComment.last_update_date.desc())
+                .all()
+            )
+
+            jira_comments = [
+                {
+                    'author': c.author,
+                    'updated': c.last_update_date.isoformat(),
+                    'body': c.body
+                }
+                for c in jira_comments_query
+            ]
+
+        portal_comments_data = [
+            {
+                'author': c.author,
+                'date': c.commented_at.isoformat(),
+                'body': c.comment_text
+            }
+            for c in portal_comments
+        ]
+
+        return jsonify({
+            'portal_comments': portal_comments_data,
+            'jira_comments': jira_comments
+        })
+
+    finally:
+        session.close()

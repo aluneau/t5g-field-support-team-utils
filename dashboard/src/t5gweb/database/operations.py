@@ -200,6 +200,21 @@ def load_jira_card_postgres(cases, case_number, issue):
                 # Temporarily disabled
                 # jira_issue_created_date = parser.parse(issue.fields.created)
                 time_now = datetime.now(timezone.utc)
+
+                # Extract sprint value - use the LAST sprint (most recent)
+                sprint_value = None
+                if hasattr(issue.fields, "customfield_10020") and issue.fields.customfield_10020:
+                    sprint_obj = issue.fields.customfield_10020[-1]  # Get last sprint, not first
+                    raw_sprint_name = getattr(sprint_obj, 'name', str(sprint_obj))
+                    # Normalize sprint name to "T5GFE Sprint XXX" format
+                    # Extract number from names like "RAN Automation Sprint 291" or "T5GFE Sprint 291"
+                    import re
+                    match = re.search(r'Sprint\s+(\d+)', raw_sprint_name)
+                    if match:
+                        sprint_value = f"T5GFE Sprint {match.group(1)}"
+                    else:
+                        sprint_value = raw_sprint_name
+
                 jira_card = JiraCard(
                     jira_card_id=issue.key,
                     case_number=case_number,
@@ -218,17 +233,38 @@ def load_jira_card_postgres(cases, case_number, issue):
                         if issue.fields.assignee
                         else None
                     ),
-                    sprint=(
-                        str(issue.fields.customfield_10020[0])
-                        if hasattr(issue.fields, "customfield_10020")
-                        and issue.fields.customfield_10020
-                        else None
-                    ),
+                    sprint=sprint_value,
                     severity=severity_int,
                 )
                 session.add(jira_card)
                 card_processed = True
         else:
+            # Update existing card with current data from JIRA
+            time_now = datetime.now(timezone.utc)
+
+            # Extract sprint value - use the LAST sprint (most recent)
+            sprint_value = None
+            if hasattr(issue.fields, "customfield_10020") and issue.fields.customfield_10020:
+                sprint_obj = issue.fields.customfield_10020[-1]  # Get last sprint, not first
+                raw_sprint_name = getattr(sprint_obj, 'name', str(sprint_obj))
+                # Normalize sprint name to "T5GFE Sprint XXX" format
+                # Extract number from names like "RAN Automation Sprint 291" or "T5GFE Sprint 291"
+                import re
+                match = re.search(r'Sprint\s+(\d+)', raw_sprint_name)
+                if match:
+                    sprint_value = f"T5GFE Sprint {match.group(1)}"
+                else:
+                    sprint_value = raw_sprint_name
+
+            # Update mutable fields
+            jira_card.last_update_date = time_now
+            jira_card.summary = issue.fields.summary
+            jira_card.priority = issue.fields.priority.name if issue.fields.priority else None
+            jira_card.status = issue.fields.status.name
+            jira_card.assignee = issue.fields.assignee.displayName if issue.fields.assignee else None
+            jira_card.sprint = sprint_value
+
+            session.merge(jira_card)
             card_processed = True
 
         # Only process comments if the card was successfully processed
@@ -289,3 +325,169 @@ def load_jira_card_postgres(cases, case_number, issue):
         session.close()
 
     return card_processed, card_comments  # Return both values
+
+
+def get_engineering_cases(active_sprint_name=None, engineer_filter=None):
+    """Query cases that need engineering attention.
+
+    Filters cases based on:
+    1. Portal status is not "Closed"
+    2. Has an associated JIRA card
+    3. Most recent portal comment is newer than most recent JIRA comment
+    4. Optionally filtered by sprint and/or engineer
+
+    Args:
+        active_sprint_name: Name/ID of the sprint to filter by (optional)
+        engineer_filter: Engineer name to filter by (optional)
+
+    Returns:
+        dict: Cases needing attention, keyed by case_number, with structure:
+            {
+                case_number: {
+                    'case_number': str,
+                    'severity': int,
+                    'summary': str,
+                    'field_engineer': str,
+                    'portal_status': str,
+                    'jira_status': str,
+                    'portal_comments': [{'author': str, 'date': datetime, 'body': str}],
+                    'jira_comments': [{'author': str, 'updated': datetime, 'body': str}],
+                    'most_recent_jira_comment': {'author': str, 'updated': str, 'body': str}
+                }
+            }
+    """
+    session = db_config.SessionLocal()
+    engineering_cases = {}
+
+    try:
+        # Query cases with JIRA cards - filter by sprint if provided
+        cases_query = (
+            session.query(Case, JiraCard)
+            .join(JiraCard,
+                  (Case.case_number == JiraCard.case_number) &
+                  (Case.created_date == JiraCard.created_date))
+            .filter(Case.status != 'Closed')
+        )
+
+        # Apply sprint filter if provided
+        if active_sprint_name:
+            cases_query = cases_query.filter(JiraCard.sprint == active_sprint_name)
+            sprint_msg = f"sprint '{active_sprint_name}'"
+        else:
+            sprint_msg = "all sprints"
+
+        # Apply engineer filter if provided
+        if engineer_filter:
+            cases_query = cases_query.filter(JiraCard.assignee == engineer_filter)
+            engineer_msg = f", engineer '{engineer_filter}'"
+        else:
+            engineer_msg = ""
+
+        all_cases = cases_query.all()
+        logging.warning(f"Found {len(all_cases)} total cases (not closed, {sprint_msg}{engineer_msg})")
+
+        filtered_count = 0
+        no_jira_comments = 0
+        jira_newer = 0
+        no_portal_comments = 0
+        included_no_jira = 0
+
+        for case, jira_card in all_cases:
+            # Load portal comments (newest first)
+            portal_comments = (
+                session.query(Comment)
+                .filter(Comment.case_number == case.case_number)
+                .filter(Comment.created_date == case.created_date)
+                .order_by(Comment.commented_at.desc())
+                .all()
+            )
+
+            # Load JIRA comments (newest first)
+            jira_comments = (
+                session.query(JiraComment)
+                .filter(JiraComment.jira_card_id == jira_card.jira_card_id)
+                .order_by(JiraComment.last_update_date.desc())
+                .all()
+            )
+
+            # Track cases without portal comments
+            if not portal_comments:
+                no_portal_comments += 1
+
+            # If no JIRA comments exist, INCLUDE the case (Vue behavior line 50)
+            if not jira_comments:
+                no_jira_comments += 1
+                included_no_jira += 1
+                # Fall through to add this case
+            else:
+                # Get most recent comment dates
+                jira_comment_last_update = jira_comments[0].last_update_date
+                portal_comment_last_update = (
+                    portal_comments[0].commented_at if portal_comments
+                    else datetime(1970, 1, 1, tzinfo=timezone.utc)
+                )
+
+                # Ensure both datetimes are timezone-aware for comparison
+                if jira_comment_last_update.tzinfo is None:
+                    jira_comment_last_update = jira_comment_last_update.replace(tzinfo=timezone.utc)
+                if portal_comment_last_update.tzinfo is None:
+                    portal_comment_last_update = portal_comment_last_update.replace(tzinfo=timezone.utc)
+
+                # Only include if portal comment is newer than JIRA comment
+                # (Vue line 41: if jira >= portal, exclude)
+                if jira_comment_last_update >= portal_comment_last_update:
+                    jira_newer += 1
+                    continue
+
+            filtered_count += 1
+
+            # Format portal comments
+            formatted_portal_comments = [
+                {
+                    'author': comment.author,
+                    'date': comment.commented_at.isoformat(),
+                    'body': comment.comment_text
+                }
+                for comment in portal_comments
+            ]
+
+            # Format JIRA comments
+            formatted_jira_comments = [
+                {
+                    'author': comment.author,
+                    'updated': comment.last_update_date.isoformat(),
+                    'body': comment.body
+                }
+                for comment in jira_comments
+            ]
+
+            # Build result structure
+            engineering_cases[case.case_number] = {
+                'case_number': case.case_number,
+                'severity': case.severity,
+                'summary': case.summary,
+                'field_engineer': jira_card.assignee,
+                'portal_status': case.status,
+                'jira_status': jira_card.status,
+                'portal_comments': formatted_portal_comments,
+                'jira_comments': formatted_jira_comments,
+                'most_recent_jira_comment': formatted_jira_comments[0] if formatted_jira_comments else None
+            }
+
+        logging.warning(f"Filtering results: {filtered_count} cases need attention out of {len(all_cases)} total")
+        logging.warning(f"  - Cases with no JIRA comments (included): {included_no_jira}")
+        logging.warning(f"  - Cases with no portal comments: {no_portal_comments}")
+        logging.warning(f"  - Cases where JIRA comment is newer (excluded): {jira_newer}")
+
+        # Log breakdown by engineer
+        from collections import Counter
+        engineer_counts = Counter(case_data['field_engineer'] for case_data in engineering_cases.values())
+        logging.warning(f"Cases by engineer: {dict(engineer_counts)}")
+
+    except Exception as e:
+        logging.error(f"Failed to get engineering cases: {e}")
+        session.rollback()
+    finally:
+        session.close()
+
+    return engineering_cases

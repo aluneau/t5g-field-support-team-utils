@@ -1,0 +1,49 @@
+{% extends "skeleton.html" %}
+{% import 'macros/macros.html' as macros %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block content %}
+    <div class="container-fluid copy mt-5">
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <h2>Engineering View</h2>
+                <p class="text-muted">Cases where customers have commented after engineering team</p>
+            </div>
+            <div class="col-md-4">
+                <form method="get" class="row g-2">
+                    <div class="col-12">
+                        <label for="sprint-select" class="form-label fw-bold">Sprint Filter:</label>
+                        <select name="sprint" id="sprint-select" class="form-select" onchange="this.form.submit()">
+                            <option value="all" {% if active_sprint == "All Active Sprints" %}selected{% endif %}>All Sprints (Default)</option>
+                            <option value="{{ current_sprint }}" {% if selected_sprint == current_sprint %}selected{% endif %}>Current Sprint ({{ current_sprint }})</option>
+                            <optgroup label="Recent Sprints">
+                                {% for sprint in available_sprints %}
+                                    {% if sprint != current_sprint %}
+                                        <option value="{{ sprint }}" {% if selected_sprint == sprint %}selected{% endif %}>{{ sprint }}</option>
+                                    {% endif %}
+                                {% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+                    {% if engineer_filter %}
+                        <input type="hidden" name="engineer" value="{{ engineer_filter }}">
+                        <div class="col-12">
+                            <span class="badge bg-info">Filtered by: {{ engineer_filter }}</span>
+                            <a href="?sprint={{ selected_sprint or '' }}" class="btn btn-sm btn-outline-secondary">Clear Engineer Filter</a>
+                        </div>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+
+        <div class="alert alert-info">
+            <strong>Showing:</strong> {{ active_sprint }}
+            {% if engineer_filter %} | <strong>Engineer:</strong> {{ engineer_filter }}{% endif %}
+            | <strong>Cases:</strong> {{ cases|length }}
+        </div>
+
+        {{ macros.engineering_cases_table(cases, jira_server) }}
+    </div>
+    {{ macros.include_datatables_js_css() }}
+    {{ macros.include_datatables_plugins_js_css() }}
+    <script src="{{ url_for('static', filename='js/engineering.js') }}"></script>
+{% endblock %}
