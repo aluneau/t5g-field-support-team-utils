@@ -201,14 +201,11 @@ def load_jira_card_postgres(cases, case_number, issue):
                 # Skip this card - will be handled in finally block
                 card_processed = False
             else:
-                # Temporarily disabled
-                # jira_issue_created_date = parser.parse(issue.fields.created)
                 time_now = datetime.now(timezone.utc)
 
-                # Extract sprint value - use the LAST sprint (most recent)
                 sprint_value = None
                 if hasattr(issue.fields, "customfield_10020") and issue.fields.customfield_10020:
-                    sprint_obj = issue.fields.customfield_10020[-1]  # Get last sprint, not first
+                    sprint_obj = issue.fields.customfield_10020[-1]
                     raw_sprint_name = getattr(sprint_obj, 'name', str(sprint_obj))
                     match = re.search(r'Sprint\s+(\d+)', raw_sprint_name)
                     if match:
@@ -219,10 +216,7 @@ def load_jira_card_postgres(cases, case_number, issue):
                 jira_card = JiraCard(
                     jira_card_id=issue.key,
                     case_number=case_number,
-                    # Use case creation date for FK
                     created_date=case_created_date,
-                    # Store Jira issue creation date separately - temporarily disabled
-                    # jira_created_date=jira_issue_created_date,
                     last_update_date=time_now,
                     summary=issue.fields.summary,
                     priority=(
@@ -240,13 +234,11 @@ def load_jira_card_postgres(cases, case_number, issue):
                 session.add(jira_card)
                 card_processed = True
         else:
-            # Update existing card with current data from JIRA
             time_now = datetime.now(timezone.utc)
 
-            # Extract sprint value - use the LAST sprint (most recent)
             sprint_value = None
             if hasattr(issue.fields, "customfield_10020") and issue.fields.customfield_10020:
-                sprint_obj = issue.fields.customfield_10020[-1]  # Get last sprint, not first
+                sprint_obj = issue.fields.customfield_10020[-1]
                 raw_sprint_name = getattr(sprint_obj, 'name', str(sprint_obj))
                 match = re.search(r'Sprint\s+(\d+)', raw_sprint_name)
                 if match:
@@ -254,7 +246,6 @@ def load_jira_card_postgres(cases, case_number, issue):
                 else:
                     sprint_value = raw_sprint_name
 
-            # Update mutable fields
             jira_card.last_update_date = time_now
             jira_card.summary = issue.fields.summary
             jira_card.priority = issue.fields.priority.name if issue.fields.priority else None
