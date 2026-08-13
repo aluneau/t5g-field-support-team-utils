@@ -90,6 +90,7 @@ class Comment(Base):
     )  # Same as in Case
 
     author: Mapped[str] = mapped_column(String, nullable=False)
+    comment_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     comment_text: Mapped[str] = mapped_column(Text, nullable=False)
     commented_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 

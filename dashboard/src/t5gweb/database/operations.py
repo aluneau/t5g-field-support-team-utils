@@ -104,6 +104,7 @@ def load_comments_postgres(case_number, case_created_date, api_comments):
         for api_comment in api_comments:
             author = api_comment.get("createdBy", "unknown")
             body = api_comment.get("commentBody", "")
+            comment_type = api_comment.get("createdByType")
             commented_at_str = api_comment.get("createdDate")
             if not commented_at_str:
                 continue
@@ -124,10 +125,13 @@ def load_comments_postgres(case_number, case_created_date, api_comments):
                     case_number=case_number,
                     created_date=case_created_date,
                     author=author,
+                    comment_type=comment_type,
                     comment_text=body,
                     commented_at=commented_at,
                 )
                 session.add(comment)
+            elif existing.comment_type is None and comment_type:
+                existing.comment_type = comment_type
 
         session.commit()
     except Exception as e:
@@ -206,9 +210,6 @@ def load_jira_card_postgres(cases, case_number, issue):
                 if hasattr(issue.fields, "customfield_10020") and issue.fields.customfield_10020:
                     sprint_obj = issue.fields.customfield_10020[-1]  # Get last sprint, not first
                     raw_sprint_name = getattr(sprint_obj, 'name', str(sprint_obj))
-                    # Normalize sprint name to "T5GFE Sprint XXX" format
-                    # Extract number from names like "RAN Automation Sprint 291" or "T5GFE Sprint 291"
-                    import re
                     match = re.search(r'Sprint\s+(\d+)', raw_sprint_name)
                     if match:
                         sprint_value = f"T5GFE Sprint {match.group(1)}"
@@ -247,9 +248,6 @@ def load_jira_card_postgres(cases, case_number, issue):
             if hasattr(issue.fields, "customfield_10020") and issue.fields.customfield_10020:
                 sprint_obj = issue.fields.customfield_10020[-1]  # Get last sprint, not first
                 raw_sprint_name = getattr(sprint_obj, 'name', str(sprint_obj))
-                # Normalize sprint name to "T5GFE Sprint XXX" format
-                # Extract number from names like "RAN Automation Sprint 291" or "T5GFE Sprint 291"
-                import re
                 match = re.search(r'Sprint\s+(\d+)', raw_sprint_name)
                 if match:
                     sprint_value = f"T5GFE Sprint {match.group(1)}"

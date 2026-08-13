@@ -762,6 +762,7 @@ def get_case_comments(case_number):
             {
                 'author': c.author,
                 'date': c.commented_at.isoformat(),
+                'comment_type': c.comment_type,
                 'body': c.comment_text
             }
             for c in portal_comments

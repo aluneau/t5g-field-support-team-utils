@@ -17,13 +17,16 @@ function format (data) {
     result += "<div style='max-height: 400px; overflow-y: auto;'>"
     for (let i = 0; i < data.portal_comments.length; i++) {
       const comment = data.portal_comments[i]
-      const commentType = comment.comment_type || 'general'
-      let borderClass = 'border-primary'
-      if (commentType === 'customer') borderClass = 'border-info'
-      else if (commentType === 'bug') borderClass = 'border-danger'
+      const commentType = comment.comment_type || ''
+      let borderColor = '#6c757d'
+      let typeLabel = commentType
+      if (commentType === 'Customer') { borderColor = 'rgb(0, 103, 187)' }
+      else if (commentType === 'Associate') { borderColor = 'rgb(187, 0, 0)' }
+      else if (commentType === 'Bug') { borderColor = 'rgb(120, 0, 187)' }
+      else if (commentType === 'Partner') { borderColor = 'rgb(0, 150, 100)' }
 
-      result += "<div class='mb-3 p-2 border-start border-3 " + borderClass + "'>"
-      result += "<div class='fw-bold'>" + (comment.author || 'Unknown') + "</div>"
+      result += "<div class='mb-3 p-2' style='border-left: 3px solid " + borderColor + ";'>"
+      result += "<div class='fw-bold'>" + (comment.author || 'Unknown') + (typeLabel ? " <span class='fw-normal text-muted'>(" + typeLabel + ")</span>" : '') + "</div>"
       result += "<div class='text-muted small'>" + (comment.date ? comment.date.substring(0, 19).replace('T', ' ') : 'No date') + "</div>"
       result += "<div class='mt-2'>" + (comment.body || '') + "</div>"
       result += "</div>"
