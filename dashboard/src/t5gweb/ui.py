@@ -18,7 +18,7 @@ from flask import (
     session,
     url_for,
 )
-from flask_login import LoginManager, UserMixin, login_required, login_user
+from flask_login import LoginManager, UserMixin, current_user, login_required, login_user
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
 from onelogin.saml2.utils import OneLogin_Saml2_Utils
 
@@ -57,7 +57,14 @@ class User(UserMixin):
         user = users[user_id]
         self.id = user_id
         self.given_name = user["givenName"][0]
+        self.sn = user.get("sn", [""])[0]
         self.mail = user["mail"][0]
+
+    @property
+    def display_name(self):
+        if self.given_name and self.sn:
+            return f"{self.given_name} {self.sn}"
+        return self.given_name
 
 
 def is_safe_url(target):
@@ -635,26 +642,25 @@ def get_engineer(engineer):
 @BP.route("/engineering")
 @login_required
 def engineering_view():
-    """Display engineering cases needing attention for current sprint
+    """Display engineering cases needing attention for the logged-in engineer.
 
-    Shows cases where the customer has commented after the engineering team,
-    filtered to the currently active sprint. Provides read-only view with
-    expandable rows showing portal and JIRA comments side-by-side.
-
-    Query parameters:
-        engineer: Filter by engineer name (e.g., ?engineer=Adrien Luneau)
-        all_sprints: If "true", show all sprints instead of just current sprint
-        sprint: Specific sprint name to filter by (e.g., ?sprint=T5GFE Sprint 291)
-
-    Returns:
-        str: Rendered HTML template with engineering cases table
+    Shows only the current user's cases where customers have commented after
+    the engineering team. The engineer filter is derived from the SAML login
+    or from the ENGINEER_OVERRIDE env var for local testing.
     """
     cfg = set_cfg()
 
     # Check for query parameters
-    engineer_filter = request.args.get('engineer')
     show_all_sprints = request.args.get('all_sprints') == 'true'
     selected_sprint = request.args.get('sprint')
+
+    engineer_override = os.getenv("ENGINEER_OVERRIDE")
+    if engineer_override:
+        engineer_filter = engineer_override
+    elif current_user.is_authenticated:
+        engineer_filter = current_user.display_name
+    else:
+        engineer_filter = None
 
     from t5gweb.database.session import db_config
     from t5gweb.database.models import JiraCard
