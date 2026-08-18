@@ -220,7 +220,11 @@ def load_jira_card_postgres(cases, case_number, issue):
                     jira_card_id=issue.key,
                     case_number=case_number,
                     created_date=case_created_date,
-                    last_update_date=time_now,
+                    last_update_date=(
+                        parser.parse(issue.fields.updated)
+                        if getattr(issue.fields, "updated", None)
+                        else time_now
+                    ),
                     summary=issue.fields.summary,
                     priority=(
                         issue.fields.priority.name if issue.fields.priority else None
@@ -252,7 +256,11 @@ def load_jira_card_postgres(cases, case_number, issue):
                 else:
                     sprint_value = raw_sprint_name
 
-            jira_card.last_update_date = time_now
+            jira_card.last_update_date = (
+                parser.parse(issue.fields.updated)
+                if getattr(issue.fields, "updated", None)
+                else time_now
+            )
             jira_card.summary = issue.fields.summary
             jira_card.priority = (
                 issue.fields.priority.name if issue.fields.priority else None
