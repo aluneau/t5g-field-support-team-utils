@@ -653,10 +653,6 @@ def engineering_view():
     """
     cfg = set_cfg()
 
-    # Check for query parameters
-    show_all_sprints = request.args.get("all_sprints") == "true"
-    selected_sprint = request.args.get("sprint")
-
     engineer_override = os.getenv("ENGINEER_OVERRIDE")
     if engineer_override:
         engineer_filter = engineer_override
@@ -665,57 +661,14 @@ def engineering_view():
     else:
         engineer_filter = None
 
-    from sqlalchemy import func
-
-    from t5gweb.database.models import JiraCard
-    from t5gweb.database.session import db_config
-
-    session = db_config.SessionLocal()
-    try:
-        # Get list of available sprints for dropdown
-        available_sprints = (
-            session.query(JiraCard.sprint, func.count(JiraCard.jira_card_id))
-            .filter(JiraCard.sprint.isnot(None))
-            .group_by(JiraCard.sprint)
-            .order_by(func.count(JiraCard.jira_card_id).desc())
-            .limit(10)
-            .all()
-        )
-
-        # Get the current sprint (most common one)
-        current_sprint = (
-            available_sprints[0][0] if available_sprints else "T5GFE Sprint 291"
-        )
-
-        if show_all_sprints or selected_sprint == "all":
-            # Show all sprints
-            normalized_sprint_name = None
-            sprint_display = "All Active Sprints"
-        elif selected_sprint:
-            # User selected a specific sprint
-            normalized_sprint_name = selected_sprint
-            sprint_display = selected_sprint
-        else:
-            # Default to ALL sprints (match Vue behavior)
-            normalized_sprint_name = None
-            sprint_display = "All Active Sprints"
-
-    finally:
-        session.close()
-
-    # Query cases
-    engineering_cases = get_engineering_cases(normalized_sprint_name, engineer_filter)
+    engineering_cases = get_engineering_cases(engineer_filter=engineer_filter)
 
     return render_template(
         "ui/engineering.html",
         cases=engineering_cases,
-        active_sprint=sprint_display,
         jira_server=cfg["server"],
         page_title="Engineering View",
         engineer_filter=engineer_filter,
-        available_sprints=[sprint[0] for sprint in available_sprints],
-        current_sprint=current_sprint,
-        selected_sprint=normalized_sprint_name,
     )
 
 
