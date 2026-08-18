@@ -18,7 +18,13 @@ from flask import (
     session,
     url_for,
 )
-from flask_login import LoginManager, UserMixin, current_user, login_required, login_user
+from flask_login import (
+    LoginManager,
+    UserMixin,
+    current_user,
+    login_required,
+    login_user,
+)
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
 from onelogin.saml2.utils import OneLogin_Saml2_Utils
 
@@ -26,9 +32,6 @@ from t5gweb.database.operations import get_engineering_cases
 from t5gweb.libtelco5g import (
     generate_histogram_stats,
     generate_stats,
-    get_board_id,
-    get_latest_sprint,
-    jira_connection,
     plot_stats,
     redis_get,
     redis_set,
@@ -651,8 +654,8 @@ def engineering_view():
     cfg = set_cfg()
 
     # Check for query parameters
-    show_all_sprints = request.args.get('all_sprints') == 'true'
-    selected_sprint = request.args.get('sprint')
+    show_all_sprints = request.args.get("all_sprints") == "true"
+    selected_sprint = request.args.get("sprint")
 
     engineer_override = os.getenv("ENGINEER_OVERRIDE")
     if engineer_override:
@@ -662,9 +665,10 @@ def engineering_view():
     else:
         engineer_filter = None
 
-    from t5gweb.database.session import db_config
-    from t5gweb.database.models import JiraCard
     from sqlalchemy import func
+
+    from t5gweb.database.models import JiraCard
+    from t5gweb.database.session import db_config
 
     session = db_config.SessionLocal()
     try:
@@ -679,7 +683,9 @@ def engineering_view():
         )
 
         # Get the current sprint (most common one)
-        current_sprint = available_sprints[0][0] if available_sprints else "T5GFE Sprint 291"
+        current_sprint = (
+            available_sprints[0][0] if available_sprints else "T5GFE Sprint 291"
+        )
 
         if show_all_sprints or selected_sprint == "all":
             # Show all sprints
@@ -720,8 +726,8 @@ def get_case_comments(case_number):
 
     Returns JSON with portal_comments and jira_comments arrays
     """
-    from t5gweb.database.session import db_config
     from t5gweb.database.models import Case, Comment, JiraCard, JiraComment
+    from t5gweb.database.session import db_config
 
     session = db_config.SessionLocal()
     try:
@@ -741,9 +747,7 @@ def get_case_comments(case_number):
 
         # Get jira card and comments
         jira_card = (
-            session.query(JiraCard)
-            .filter(JiraCard.case_number == case_number)
-            .first()
+            session.query(JiraCard).filter(JiraCard.case_number == case_number).first()
         )
 
         jira_comments = []
@@ -757,27 +761,26 @@ def get_case_comments(case_number):
 
             jira_comments = [
                 {
-                    'author': c.author,
-                    'updated': c.last_update_date.isoformat(),
-                    'body': c.body
+                    "author": c.author,
+                    "updated": c.last_update_date.isoformat(),
+                    "body": c.body,
                 }
                 for c in jira_comments_query
             ]
 
         portal_comments_data = [
             {
-                'author': c.author,
-                'date': c.commented_at.isoformat(),
-                'comment_type': c.comment_type,
-                'body': c.comment_text
+                "author": c.author,
+                "date": c.commented_at.isoformat(),
+                "comment_type": c.comment_type,
+                "body": c.comment_text,
             }
             for c in portal_comments
         ]
 
-        return jsonify({
-            'portal_comments': portal_comments_data,
-            'jira_comments': jira_comments
-        })
+        return jsonify(
+            {"portal_comments": portal_comments_data, "jira_comments": jira_comments}
+        )
 
     finally:
         session.close()

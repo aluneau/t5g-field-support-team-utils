@@ -1,5 +1,5 @@
 // Engineering View DataTable initialization
-/* globals $, history */ // eslint-disable-line no-redeclare
+/* globals $ */ // eslint-disable-line no-redeclare
 
 /**
  * Format child row content with two-column layout for portal and JIRA comments
@@ -7,56 +7,64 @@
  * @returns {string} HTML string for child row
  */
 function format (data) {
-  let result = "<div class='card p-3'>"
-  result += "<div class='row'>"
+  let result = '<div class=\'card p-3\'>'
+  result += '<div class=\'row\'>'
 
   // Left column - Portal comments (60% width)
-  result += "<div class='col-md-7'>"
-  result += "<h4>Portal Comments</h4>"
+  result += '<div class=\'col-md-7\'>'
+  result += '<h4>Portal Comments</h4>'
   if (data.portal_comments && data.portal_comments.length > 0) {
-    result += "<div style='max-height: 400px; overflow-y: auto;'>"
+    result += '<div style=\'max-height: 400px; overflow-y: auto;\'>'
     for (let i = 0; i < data.portal_comments.length; i++) {
       const comment = data.portal_comments[i]
       const commentType = comment.comment_type || ''
+      const typeLabel = commentType
       let borderColor = '#6c757d'
-      let typeLabel = commentType
-      if (commentType === 'Customer') { borderColor = 'rgb(0, 103, 187)' }
-      else if (commentType === 'Associate') { borderColor = 'rgb(187, 0, 0)' }
-      else if (commentType === 'Bug') { borderColor = 'rgb(120, 0, 187)' }
-      else if (commentType === 'Partner') { borderColor = 'rgb(0, 150, 100)' }
+      if (commentType === 'Customer') {
+        borderColor = 'rgb(0, 103, 187)'
+      } else if (commentType === 'Associate') {
+        borderColor = 'rgb(187, 0, 0)'
+      } else if (commentType === 'Bug') {
+        borderColor = 'rgb(120, 0, 187)'
+      } else if (commentType === 'Partner') {
+        borderColor = 'rgb(0, 150, 100)'
+      }
 
-      result += "<div class='mb-3 p-2' style='border-left: 3px solid " + borderColor + ";'>"
-      result += "<div class='fw-bold'>" + (comment.author || 'Unknown') + (typeLabel ? " <span class='fw-normal text-muted'>(" + typeLabel + ")</span>" : '') + "</div>"
-      result += "<div class='text-muted small'>" + (comment.date ? comment.date.substring(0, 19).replace('T', ' ') : 'No date') + "</div>"
-      result += "<div class='mt-2'>" + (comment.body || '') + "</div>"
-      result += "</div>"
+      result += '<div class=\'mb-3 p-2\' style=\'border-left: 3px solid ' + borderColor + ';\'>'
+      result += '<div class=\'fw-bold\'>' + (comment.author || 'Unknown') +
+        (typeLabel ? ' <span class=\'fw-normal text-muted\'>(' + typeLabel + ')</span>' : '') + '</div>'
+      result += '<div class=\'text-muted small\'>' +
+        (comment.date ? comment.date.substring(0, 19).replace('T', ' ') : 'No date') + '</div>'
+      result += '<div class=\'mt-2\'>' + (comment.body || '') + '</div>'
+      result += '</div>'
     }
-    result += "</div>"
+    result += '</div>'
   } else {
-    result += "<p class='text-muted'>No portal comments</p>"
+    result += '<p class=\'text-muted\'>No portal comments</p>'
   }
-  result += "</div>"
+  result += '</div>'
 
   // Right column - JIRA comments (40% width)
-  result += "<div class='col-md-5'>"
-  result += "<h4>JIRA Comments</h4>"
+  result += '<div class=\'col-md-5\'>'
+  result += '<h4>JIRA Comments</h4>'
   if (data.jira_comments && data.jira_comments.length > 0) {
-    result += "<div style='max-height: 400px; overflow-y: auto;'>"
+    result += '<div style=\'max-height: 400px; overflow-y: auto;\'>'
     for (let i = 0; i < data.jira_comments.length; i++) {
       const comment = data.jira_comments[i]
-      result += "<div class='mb-3 p-2 border-start border-3 border-success'>"
-      result += "<div class='fw-bold'>" + (comment.author || 'Unknown') + "</div>"
-      result += "<div class='text-muted small'>" + (comment.updated ? comment.updated.substring(0, 19).replace('T', ' ') : 'No date') + "</div>"
-      result += "<div class='mt-2'>" + (comment.body || '') + "</div>"
-      result += "</div>"
+      result += '<div class=\'mb-3 p-2 border-start border-3 border-success\'>'
+      result += '<div class=\'fw-bold\'>' + (comment.author || 'Unknown') + '</div>'
+      result += '<div class=\'text-muted small\'>' +
+        (comment.updated ? comment.updated.substring(0, 19).replace('T', ' ') : 'No date') + '</div>'
+      result += '<div class=\'mt-2\'>' + (comment.body || '') + '</div>'
+      result += '</div>'
     }
-    result += "</div>"
+    result += '</div>'
   } else {
-    result += "<p class='text-muted'>No JIRA comments</p>"
+    result += '<p class=\'text-muted\'>No JIRA comments</p>'
   }
-  result += "</div>"
+  result += '</div>'
 
-  result += "</div></div>"
+  result += '</div></div>'
   return result
 }
 

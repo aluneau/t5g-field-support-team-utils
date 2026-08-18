@@ -7,11 +7,8 @@ which is the core business logic behind the /engineering route.
 
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from t5gweb.database import Case, Comment, JiraCard, JiraComment
 from t5gweb.database.operations import get_engineering_cases
-
 
 CASE_DATE = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
@@ -31,8 +28,13 @@ def _case(case_number="10000001", status="Open", severity=3, **kwargs):
     return Case(case_number=case_number, status=status, severity=severity, **defaults)
 
 
-def _card(jira_card_id="CARD-1", case_number="10000001", assignee="engineer1",
-          sprint="Sprint 1", **kwargs):
+def _card(
+    jira_card_id="CARD-1",
+    case_number="10000001",
+    assignee="engineer1",
+    sprint="Sprint 1",
+    **kwargs,
+):
     defaults = dict(
         created_date=CASE_DATE,
         last_update_date=CASE_DATE,
@@ -51,8 +53,13 @@ def _card(jira_card_id="CARD-1", case_number="10000001", assignee="engineer1",
     )
 
 
-def _portal_comment(case_number="10000001", commented_at=None, author="customer1",
-                    text="portal comment", comment_type=None):
+def _portal_comment(
+    case_number="10000001",
+    commented_at=None,
+    author="customer1",
+    text="portal comment",
+    comment_type=None,
+):
     if commented_at is None:
         commented_at = CASE_DATE + timedelta(days=1)
     return Comment(
@@ -65,8 +72,13 @@ def _portal_comment(case_number="10000001", commented_at=None, author="customer1
     )
 
 
-def _jira_comment(jira_card_id="CARD-1", jira_comment_id="jc-1",
-                  last_update_date=None, author="eng1", body="jira comment"):
+def _jira_comment(
+    jira_card_id="CARD-1",
+    jira_comment_id="jc-1",
+    last_update_date=None,
+    author="eng1",
+    body="jira comment",
+):
     if last_update_date is None:
         last_update_date = CASE_DATE + timedelta(days=1)
     return JiraComment(
@@ -88,73 +100,94 @@ class TestGetEngineeringCasesInclusion:
     """Test which cases are included/excluded based on comment timestamps."""
 
     def test_portal_comment_newer_than_jira_included(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(),
-            _portal_comment(commented_at=CASE_DATE + timedelta(days=5)),
-            _jira_comment(last_update_date=CASE_DATE + timedelta(days=3)),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(),
+                _portal_comment(commented_at=CASE_DATE + timedelta(days=5)),
+                _jira_comment(last_update_date=CASE_DATE + timedelta(days=3)),
+            ],
+        )
 
         result = get_engineering_cases()
         assert "10000001" in result
 
     def test_jira_comment_newer_than_portal_excluded(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(),
-            _portal_comment(commented_at=CASE_DATE + timedelta(days=1)),
-            _jira_comment(last_update_date=CASE_DATE + timedelta(days=3)),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(),
+                _portal_comment(commented_at=CASE_DATE + timedelta(days=1)),
+                _jira_comment(last_update_date=CASE_DATE + timedelta(days=3)),
+            ],
+        )
 
         result = get_engineering_cases()
         assert "10000001" not in result
 
     def test_jira_comment_same_time_as_portal_excluded(self, test_db_session):
         ts = CASE_DATE + timedelta(days=2)
-        _seed(test_db_session, [
-            _case(),
-            _card(),
-            _portal_comment(commented_at=ts),
-            _jira_comment(last_update_date=ts),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(),
+                _portal_comment(commented_at=ts),
+                _jira_comment(last_update_date=ts),
+            ],
+        )
 
         result = get_engineering_cases()
         assert "10000001" not in result
 
     def test_no_jira_comments_included(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(),
-            _portal_comment(),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(),
+                _portal_comment(),
+            ],
+        )
 
         result = get_engineering_cases()
         assert "10000001" in result
 
     def test_no_jira_comments_no_portal_comments_included(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(),
+            ],
+        )
 
         result = get_engineering_cases()
         assert "10000001" in result
 
     def test_no_portal_comments_with_jira_comment_excluded(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(),
-            _jira_comment(last_update_date=CASE_DATE + timedelta(days=1)),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(),
+                _jira_comment(last_update_date=CASE_DATE + timedelta(days=1)),
+            ],
+        )
 
         result = get_engineering_cases()
         assert "10000001" not in result
 
     def test_closed_case_excluded(self, test_db_session):
-        _seed(test_db_session, [
-            _case(status="Closed"),
-            _card(),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(status="Closed"),
+                _card(),
+            ],
+        )
 
         result = get_engineering_cases()
         assert "10000001" not in result
@@ -170,15 +203,25 @@ class TestGetEngineeringCasesFilters:
     """Test sprint and engineer filtering."""
 
     def _seed_two_cases(self, session):
-        _seed(session, [
-            _case(case_number="10000001"),
-            _card(jira_card_id="CARD-1", case_number="10000001",
-                  assignee="Alice", sprint="Sprint 1"),
-
-            _case(case_number="10000002"),
-            _card(jira_card_id="CARD-2", case_number="10000002",
-                  assignee="Bob", sprint="Sprint 2"),
-        ])
+        _seed(
+            session,
+            [
+                _case(case_number="10000001"),
+                _card(
+                    jira_card_id="CARD-1",
+                    case_number="10000001",
+                    assignee="Alice",
+                    sprint="Sprint 1",
+                ),
+                _case(case_number="10000002"),
+                _card(
+                    jira_card_id="CARD-2",
+                    case_number="10000002",
+                    assignee="Bob",
+                    sprint="Sprint 2",
+                ),
+            ],
+        )
 
     def test_filter_by_sprint(self, test_db_session):
         self._seed_two_cases(test_db_session)
@@ -197,14 +240,20 @@ class TestGetEngineeringCasesFilters:
     def test_filter_by_both_sprint_and_engineer(self, test_db_session):
         self._seed_two_cases(test_db_session)
 
-        result = get_engineering_cases(active_sprint_name="Sprint 1", engineer_filter="Alice")
+        result = get_engineering_cases(
+            active_sprint_name="Sprint 1",
+            engineer_filter="Alice",
+        )
         assert "10000001" in result
         assert len(result) == 1
 
     def test_filter_by_both_no_match(self, test_db_session):
         self._seed_two_cases(test_db_session)
 
-        result = get_engineering_cases(active_sprint_name="Sprint 1", engineer_filter="Bob")
+        result = get_engineering_cases(
+            active_sprint_name="Sprint 1",
+            engineer_filter="Bob",
+        )
         assert len(result) == 0
 
     def test_no_filters_returns_all(self, test_db_session):
@@ -230,14 +279,23 @@ class TestGetEngineeringCasesReturnStructure:
     """Test the shape and content of returned data."""
 
     def test_returned_keys(self, test_db_session):
-        _seed(test_db_session, [
-            _case(case_number="10000001", severity=2, summary="Important case"),
-            _card(assignee="Alice", status="In Progress"),
-            _portal_comment(commented_at=CASE_DATE + timedelta(days=5), author="cust",
-                            text="Please help"),
-            _jira_comment(last_update_date=CASE_DATE + timedelta(days=3), author="eng",
-                          body="Working on it"),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(case_number="10000001", severity=2, summary="Important case"),
+                _card(assignee="Alice", status="In Progress"),
+                _portal_comment(
+                    commented_at=CASE_DATE + timedelta(days=5),
+                    author="cust",
+                    text="Please help",
+                ),
+                _jira_comment(
+                    last_update_date=CASE_DATE + timedelta(days=3),
+                    author="eng",
+                    body="Working on it",
+                ),
+            ],
+        )
 
         result = get_engineering_cases()
         case = result["10000001"]
@@ -254,12 +312,15 @@ class TestGetEngineeringCasesReturnStructure:
 
     def test_portal_comment_structure(self, test_db_session):
         ts = CASE_DATE + timedelta(days=5)
-        _seed(test_db_session, [
-            _case(),
-            _card(),
-            _portal_comment(commented_at=ts, author="customer", text="Help me"),
-            _jira_comment(last_update_date=CASE_DATE + timedelta(days=3)),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(),
+                _portal_comment(commented_at=ts, author="customer", text="Help me"),
+                _jira_comment(last_update_date=CASE_DATE + timedelta(days=3)),
+            ],
+        )
 
         case = get_engineering_cases()["10000001"]
         pc = case["portal_comments"][0]
@@ -269,12 +330,15 @@ class TestGetEngineeringCasesReturnStructure:
 
     def test_jira_comment_structure(self, test_db_session):
         ts = CASE_DATE + timedelta(days=3)
-        _seed(test_db_session, [
-            _case(),
-            _card(),
-            _portal_comment(commented_at=CASE_DATE + timedelta(days=5)),
-            _jira_comment(last_update_date=ts, author="dev", body="Fixed"),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(),
+                _portal_comment(commented_at=CASE_DATE + timedelta(days=5)),
+                _jira_comment(last_update_date=ts, author="dev", body="Fixed"),
+            ],
+        )
 
         case = get_engineering_cases()["10000001"]
         jc = case["jira_comments"][0]
@@ -283,39 +347,57 @@ class TestGetEngineeringCasesReturnStructure:
         assert "2024-01-04T00:00:00" in jc["updated"]
 
     def test_most_recent_jira_comment_is_newest(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(),
-            _portal_comment(commented_at=CASE_DATE + timedelta(days=10)),
-            _jira_comment(jira_comment_id="jc-old",
-                          last_update_date=CASE_DATE + timedelta(days=1),
-                          body="old"),
-            _jira_comment(jira_comment_id="jc-new",
-                          last_update_date=CASE_DATE + timedelta(days=5),
-                          body="new"),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(),
+                _portal_comment(commented_at=CASE_DATE + timedelta(days=10)),
+                _jira_comment(
+                    jira_comment_id="jc-old",
+                    last_update_date=CASE_DATE + timedelta(days=1),
+                    body="old",
+                ),
+                _jira_comment(
+                    jira_comment_id="jc-new",
+                    last_update_date=CASE_DATE + timedelta(days=5),
+                    body="new",
+                ),
+            ],
+        )
 
         case = get_engineering_cases()["10000001"]
         assert case["most_recent_jira_comment"]["body"] == "new"
 
     def test_no_jira_comments_most_recent_is_none(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(),
+            ],
+        )
 
         case = get_engineering_cases()["10000001"]
         assert case["most_recent_jira_comment"] is None
         assert case["jira_comments"] == []
 
     def test_comments_ordered_newest_first(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(),
-            _portal_comment(commented_at=CASE_DATE + timedelta(days=10), text="newest"),
-            _portal_comment(commented_at=CASE_DATE + timedelta(days=1), text="oldest",
-                            author="customer2"),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(),
+                _portal_comment(
+                    commented_at=CASE_DATE + timedelta(days=10), text="newest"
+                ),
+                _portal_comment(
+                    commented_at=CASE_DATE + timedelta(days=1),
+                    text="oldest",
+                    author="customer2",
+                ),
+            ],
+        )
 
         case = get_engineering_cases()["10000001"]
         assert case["portal_comments"][0]["body"] == "newest"
@@ -330,11 +412,14 @@ class TestGetEngineeringCasesEdgeCases:
         assert result == {}
 
     def test_multiple_jira_cards_for_same_case(self, test_db_session):
-        _seed(test_db_session, [
-            _case(case_number="10000001"),
-            _card(jira_card_id="CARD-A", case_number="10000001", sprint="Sprint 1"),
-            _card(jira_card_id="CARD-B", case_number="10000001", sprint="Sprint 2"),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(case_number="10000001"),
+                _card(jira_card_id="CARD-A", case_number="10000001", sprint="Sprint 1"),
+                _card(jira_card_id="CARD-B", case_number="10000001", sprint="Sprint 2"),
+            ],
+        )
 
         result = get_engineering_cases()
         assert "10000001" in result
@@ -342,11 +427,13 @@ class TestGetEngineeringCasesEdgeCases:
     def test_case_with_many_comments(self, test_db_session):
         objects = [_case(), _card()]
         for i in range(20):
-            objects.append(_portal_comment(
-                commented_at=CASE_DATE + timedelta(days=i + 1),
-                text=f"comment {i}",
-                author=f"author{i}",
-            ))
+            objects.append(
+                _portal_comment(
+                    commented_at=CASE_DATE + timedelta(days=i + 1),
+                    text=f"comment {i}",
+                    author=f"author{i}",
+                )
+            )
         _seed(test_db_session, objects)
 
         result = get_engineering_cases()
@@ -358,46 +445,61 @@ class TestGetEngineeringCasesEdgeCases:
         statuses = ["Open", "Waiting on Red Hat", "Waiting on Customer"]
         for i, status in enumerate(statuses):
             cn = f"1000000{i + 1}"
-            _seed(test_db_session, [
-                _case(case_number=cn, status=status),
-                _card(jira_card_id=f"CARD-{i}", case_number=cn),
-            ])
+            _seed(
+                test_db_session,
+                [
+                    _case(case_number=cn, status=status),
+                    _card(jira_card_id=f"CARD-{i}", case_number=cn),
+                ],
+            )
 
         result = get_engineering_cases()
         assert len(result) == 3
 
     def test_null_sprint_card_returned_without_sprint_filter(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(sprint=None),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(sprint=None),
+            ],
+        )
 
         result = get_engineering_cases()
         assert "10000001" in result
 
     def test_null_sprint_card_excluded_with_sprint_filter(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(sprint=None),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(sprint=None),
+            ],
+        )
 
         result = get_engineering_cases(active_sprint_name="Sprint 1")
         assert "10000001" not in result
 
     def test_null_assignee_excluded_with_engineer_filter(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(assignee=None),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(assignee=None),
+            ],
+        )
 
         result = get_engineering_cases(engineer_filter="Alice")
         assert "10000001" not in result
 
     def test_null_assignee_returned_without_filter(self, test_db_session):
-        _seed(test_db_session, [
-            _case(),
-            _card(assignee=None),
-        ])
+        _seed(
+            test_db_session,
+            [
+                _case(),
+                _card(assignee=None),
+            ],
+        )
 
         result = get_engineering_cases()
         case = result["10000001"]

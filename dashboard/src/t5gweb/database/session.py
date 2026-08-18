@@ -6,6 +6,7 @@ from typing import Optional
 
 from sqlalchemy import URL, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
 from t5gweb.utils import set_cfg
 
 
@@ -170,11 +171,15 @@ def _migrate_add_missing_columns():
                         col_type = col.type.compile(conn.dialect)
                         logging.warning(
                             "Adding missing column %s.%s (%s)",
-                            table.name, col.name, col_type,
+                            table.name,
+                            col.name,
+                            col_type,
                         )
-                        conn.execute(text(
-                            f"ALTER TABLE {table.name} "
-                            f"ADD COLUMN {col.name} {col_type}"
-                        ))
+                        conn.execute(
+                            text(
+                                f"ALTER TABLE {table.name} "
+                                f"ADD COLUMN {col.name} {col_type}"
+                            )
+                        )
     except Exception as e:
         logging.warning("Column migration check skipped: %s", e)
