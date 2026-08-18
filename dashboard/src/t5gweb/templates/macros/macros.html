@@ -360,11 +360,11 @@
         src="{{ url_for('static', filename='node_modules/plotly.js-cartesian-dist-min/plotly-cartesian.min.js') }}"></script>
 {%- endmacro %}
 
-{% macro engineering_cases_table(cases, jira_server) -%}
+{% macro my_queue_cases_table(cases, jira_server) -%}
     <div class="loading text-center fs-3" style="display: none;">Loading Table...</div>
-    <div class="engineering-table">
-        <table class="table table-bordered table-hover table-responsive mt-5 w-100" id="engineering-data">
-            <caption style="caption-side: top; text-align: center;">Engineering cases needing attention</caption>
+    <div class="my-queue-table">
+        <table class="table table-bordered table-hover table-responsive mt-5 w-100" id="my-queue-data">
+            <caption style="caption-side: top; text-align: center;">Cases in your queue needing attention</caption>
             <thead>
                 <tr>
                     <th scope="col" class="text-center"></th>

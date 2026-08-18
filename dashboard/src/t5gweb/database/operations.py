@@ -334,8 +334,8 @@ def load_jira_card_postgres(cases, case_number, issue):
     return card_processed, card_comments  # Return both values
 
 
-def get_engineering_cases(active_sprint_name=None, engineer_filter=None):
-    """Query cases that need engineering attention.
+def get_my_queue_cases(active_sprint_name=None, engineer_filter=None):
+    """Query cases in the engineer's queue that need attention.
 
     Filters cases based on:
     1. Portal status is not "Closed"
@@ -370,7 +370,7 @@ def get_engineering_cases(active_sprint_name=None, engineer_filter=None):
             }
     """
     session = db_config.SessionLocal()
-    engineering_cases = {}
+    my_queue_cases = {}
 
     try:
         # Query cases with JIRA cards - filter by sprint if provided
@@ -411,6 +411,7 @@ def get_engineering_cases(active_sprint_name=None, engineer_filter=None):
         jira_newer = 0
         no_portal_comments = 0
         included_no_jira = 0
+        no_update_marked = 0
 
         for case, jira_card in all_cases:
             # Load portal comments (newest first)
@@ -458,6 +459,17 @@ def get_engineering_cases(active_sprint_name=None, engineer_filter=None):
                         tzinfo=timezone.utc
                     )
 
+                # Exclude if the case was marked "no update needed" more
+                # recently than the newest portal comment
+                # (Vue: if noUpdate >= portal, exclude)
+                no_update_date = jira_card.no_update_date
+                if no_update_date is not None:
+                    if no_update_date.tzinfo is None:
+                        no_update_date = no_update_date.replace(tzinfo=timezone.utc)
+                    if no_update_date >= portal_comment_last_update:
+                        no_update_marked += 1
+                        continue
+
                 # Only include if portal comment is newer than JIRA comment
                 # (Vue line 41: if jira >= portal, exclude)
                 if jira_comment_last_update >= portal_comment_last_update:
@@ -487,7 +499,7 @@ def get_engineering_cases(active_sprint_name=None, engineer_filter=None):
             ]
 
             # Build result structure
-            engineering_cases[case.case_number] = {
+            my_queue_cases[case.case_number] = {
                 "case_number": case.case_number,
                 "severity": case.severity,
                 "summary": case.summary,
@@ -518,18 +530,22 @@ def get_engineering_cases(active_sprint_name=None, engineer_filter=None):
             "  - JIRA comment newer (excluded): %d",
             jira_newer,
         )
+        logging.warning(
+            "  - Marked no update needed (excluded): %d",
+            no_update_marked,
+        )
 
         from collections import Counter
 
         engineer_counts = Counter(
-            case_data["field_engineer"] for case_data in engineering_cases.values()
+            case_data["field_engineer"] for case_data in my_queue_cases.values()
         )
         logging.warning("Cases by engineer: %s", dict(engineer_counts))
 
     except Exception as e:
-        logging.error(f"Failed to get engineering cases: {e}")
+        logging.error(f"Failed to get my queue cases: {e}")
         session.rollback()
     finally:
         session.close()
 
-    return engineering_cases
+    return my_queue_cases

@@ -5,7 +5,7 @@
     <div class="container-fluid copy mt-5 pt-4">
         <div class="row mb-4 align-items-center">
             <div class="col-md-8">
-                <h2>Engineering View</h2>
+                <h2>My Queue</h2>
                 <p class="text-muted mb-0">Cases where customers have commented after engineering team</p>
             </div>
             {% if engineer_filter %}
@@ -20,9 +20,9 @@
             <strong>Cases:</strong> {{ cases|length }}
         </div>
 
-        {{ macros.engineering_cases_table(cases, jira_server) }}
+        {{ macros.my_queue_cases_table(cases, jira_server) }}
     </div>
     {{ macros.include_datatables_js_css() }}
     {{ macros.include_datatables_plugins_js_css() }}
-    <script src="{{ url_for('static', filename='js/engineering.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/my_queue.js') }}"></script>
 {% endblock %}

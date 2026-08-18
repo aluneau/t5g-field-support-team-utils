@@ -28,7 +28,7 @@ from flask_login import (
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
 from onelogin.saml2.utils import OneLogin_Saml2_Utils
 
-from t5gweb.database.operations import get_engineering_cases
+from t5gweb.database.operations import get_my_queue_cases
 from t5gweb.libtelco5g import (
     generate_histogram_stats,
     generate_stats,
@@ -642,10 +642,10 @@ def get_engineer(engineer):
     )
 
 
-@BP.route("/engineering")
+@BP.route("/my-queue")
 @login_required
-def engineering_view():
-    """Display engineering cases needing attention for the logged-in engineer.
+def my_queue_view():
+    """Display the logged-in engineer's queue of cases needing attention.
 
     Shows only the current user's cases where customers have commented after
     the engineering team. The engineer filter is derived from the SAML login
@@ -661,18 +661,18 @@ def engineering_view():
     else:
         engineer_filter = None
 
-    engineering_cases = get_engineering_cases(engineer_filter=engineer_filter)
+    my_queue_cases = get_my_queue_cases(engineer_filter=engineer_filter)
 
     return render_template(
-        "ui/engineering.html",
-        cases=engineering_cases,
+        "ui/my_queue.html",
+        cases=my_queue_cases,
         jira_server=cfg["server"],
-        page_title="Engineering View",
+        page_title="My Queue",
         engineer_filter=engineer_filter,
     )
 
 
-@BP.route("/api/engineering/case/<case_number>/comments")
+@BP.route("/api/my-queue/case/<case_number>/comments")
 @login_required
 def get_case_comments(case_number):
     """API endpoint to fetch comments for a specific case

@@ -1,14 +1,14 @@
 """
-Tests for the engineering view feature.
+Tests for the My Queue view feature.
 
-Tests cover get_engineering_cases() from t5gweb.database.operations,
-which is the core business logic behind the /engineering route.
+Tests cover get_my_queue_cases() from t5gweb.database.operations,
+which is the core business logic behind the /my-queue route.
 """
 
 from datetime import datetime, timedelta, timezone
 
 from t5gweb.database import Case, Comment, JiraCard, JiraComment
-from t5gweb.database.operations import get_engineering_cases
+from t5gweb.database.operations import get_my_queue_cases
 
 CASE_DATE = datetime(2024, 1, 1, tzinfo=timezone.utc)
 
@@ -96,7 +96,7 @@ def _seed(session, objects):
     session.commit()
 
 
-class TestGetEngineeringCasesInclusion:
+class TestGetMyQueueCasesInclusion:
     """Test which cases are included/excluded based on comment timestamps."""
 
     def test_portal_comment_newer_than_jira_included(self, test_db_session):
@@ -110,7 +110,7 @@ class TestGetEngineeringCasesInclusion:
             ],
         )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert "10000001" in result
 
     def test_jira_comment_newer_than_portal_excluded(self, test_db_session):
@@ -124,7 +124,7 @@ class TestGetEngineeringCasesInclusion:
             ],
         )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert "10000001" not in result
 
     def test_jira_comment_same_time_as_portal_excluded(self, test_db_session):
@@ -139,7 +139,7 @@ class TestGetEngineeringCasesInclusion:
             ],
         )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert "10000001" not in result
 
     def test_no_jira_comments_included(self, test_db_session):
@@ -152,7 +152,7 @@ class TestGetEngineeringCasesInclusion:
             ],
         )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert "10000001" in result
 
     def test_no_jira_comments_no_portal_comments_included(self, test_db_session):
@@ -164,7 +164,7 @@ class TestGetEngineeringCasesInclusion:
             ],
         )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert "10000001" in result
 
     def test_no_portal_comments_with_jira_comment_excluded(self, test_db_session):
@@ -177,7 +177,7 @@ class TestGetEngineeringCasesInclusion:
             ],
         )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert "10000001" not in result
 
     def test_closed_case_excluded(self, test_db_session):
@@ -189,17 +189,17 @@ class TestGetEngineeringCasesInclusion:
             ],
         )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert "10000001" not in result
 
     def test_case_without_jira_card_excluded(self, test_db_session):
         _seed(test_db_session, [_case()])
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert "10000001" not in result
 
 
-class TestGetEngineeringCasesFilters:
+class TestGetMyQueueCasesFilters:
     """Test sprint and engineer filtering."""
 
     def _seed_two_cases(self, session):
@@ -226,21 +226,21 @@ class TestGetEngineeringCasesFilters:
     def test_filter_by_sprint(self, test_db_session):
         self._seed_two_cases(test_db_session)
 
-        result = get_engineering_cases(active_sprint_name="Sprint 1")
+        result = get_my_queue_cases(active_sprint_name="Sprint 1")
         assert "10000001" in result
         assert "10000002" not in result
 
     def test_filter_by_engineer(self, test_db_session):
         self._seed_two_cases(test_db_session)
 
-        result = get_engineering_cases(engineer_filter="Bob")
+        result = get_my_queue_cases(engineer_filter="Bob")
         assert "10000002" in result
         assert "10000001" not in result
 
     def test_filter_by_both_sprint_and_engineer(self, test_db_session):
         self._seed_two_cases(test_db_session)
 
-        result = get_engineering_cases(
+        result = get_my_queue_cases(
             active_sprint_name="Sprint 1",
             engineer_filter="Alice",
         )
@@ -250,7 +250,7 @@ class TestGetEngineeringCasesFilters:
     def test_filter_by_both_no_match(self, test_db_session):
         self._seed_two_cases(test_db_session)
 
-        result = get_engineering_cases(
+        result = get_my_queue_cases(
             active_sprint_name="Sprint 1",
             engineer_filter="Bob",
         )
@@ -259,23 +259,23 @@ class TestGetEngineeringCasesFilters:
     def test_no_filters_returns_all(self, test_db_session):
         self._seed_two_cases(test_db_session)
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert len(result) == 2
 
     def test_nonexistent_sprint_returns_empty(self, test_db_session):
         self._seed_two_cases(test_db_session)
 
-        result = get_engineering_cases(active_sprint_name="Sprint 999")
+        result = get_my_queue_cases(active_sprint_name="Sprint 999")
         assert len(result) == 0
 
     def test_nonexistent_engineer_returns_empty(self, test_db_session):
         self._seed_two_cases(test_db_session)
 
-        result = get_engineering_cases(engineer_filter="Nobody")
+        result = get_my_queue_cases(engineer_filter="Nobody")
         assert len(result) == 0
 
 
-class TestGetEngineeringCasesReturnStructure:
+class TestGetMyQueueCasesReturnStructure:
     """Test the shape and content of returned data."""
 
     def test_returned_keys(self, test_db_session):
@@ -297,7 +297,7 @@ class TestGetEngineeringCasesReturnStructure:
             ],
         )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         case = result["10000001"]
 
         assert case["case_number"] == "10000001"
@@ -322,7 +322,7 @@ class TestGetEngineeringCasesReturnStructure:
             ],
         )
 
-        case = get_engineering_cases()["10000001"]
+        case = get_my_queue_cases()["10000001"]
         pc = case["portal_comments"][0]
         assert pc["author"] == "customer"
         assert pc["body"] == "Help me"
@@ -340,7 +340,7 @@ class TestGetEngineeringCasesReturnStructure:
             ],
         )
 
-        case = get_engineering_cases()["10000001"]
+        case = get_my_queue_cases()["10000001"]
         jc = case["jira_comments"][0]
         assert jc["author"] == "dev"
         assert jc["body"] == "Fixed"
@@ -366,7 +366,7 @@ class TestGetEngineeringCasesReturnStructure:
             ],
         )
 
-        case = get_engineering_cases()["10000001"]
+        case = get_my_queue_cases()["10000001"]
         assert case["most_recent_jira_comment"]["body"] == "new"
 
     def test_no_jira_comments_most_recent_is_none(self, test_db_session):
@@ -378,7 +378,7 @@ class TestGetEngineeringCasesReturnStructure:
             ],
         )
 
-        case = get_engineering_cases()["10000001"]
+        case = get_my_queue_cases()["10000001"]
         assert case["most_recent_jira_comment"] is None
         assert case["jira_comments"] == []
 
@@ -399,16 +399,16 @@ class TestGetEngineeringCasesReturnStructure:
             ],
         )
 
-        case = get_engineering_cases()["10000001"]
+        case = get_my_queue_cases()["10000001"]
         assert case["portal_comments"][0]["body"] == "newest"
         assert case["portal_comments"][1]["body"] == "oldest"
 
 
-class TestGetEngineeringCasesEdgeCases:
+class TestGetMyQueueCasesEdgeCases:
     """Test edge cases and boundary conditions."""
 
     def test_empty_database(self, test_db_session):
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert result == {}
 
     def test_multiple_jira_cards_for_same_case(self, test_db_session):
@@ -421,7 +421,7 @@ class TestGetEngineeringCasesEdgeCases:
             ],
         )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert "10000001" in result
 
     def test_case_with_many_comments(self, test_db_session):
@@ -436,7 +436,7 @@ class TestGetEngineeringCasesEdgeCases:
             )
         _seed(test_db_session, objects)
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         case = result["10000001"]
         assert len(case["portal_comments"]) == 20
         assert case["portal_comments"][0]["body"] == "comment 19"
@@ -453,7 +453,7 @@ class TestGetEngineeringCasesEdgeCases:
                 ],
             )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert len(result) == 3
 
     def test_null_sprint_card_returned_without_sprint_filter(self, test_db_session):
@@ -465,7 +465,7 @@ class TestGetEngineeringCasesEdgeCases:
             ],
         )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         assert "10000001" in result
 
     def test_null_sprint_card_excluded_with_sprint_filter(self, test_db_session):
@@ -477,7 +477,7 @@ class TestGetEngineeringCasesEdgeCases:
             ],
         )
 
-        result = get_engineering_cases(active_sprint_name="Sprint 1")
+        result = get_my_queue_cases(active_sprint_name="Sprint 1")
         assert "10000001" not in result
 
     def test_null_assignee_excluded_with_engineer_filter(self, test_db_session):
@@ -489,7 +489,7 @@ class TestGetEngineeringCasesEdgeCases:
             ],
         )
 
-        result = get_engineering_cases(engineer_filter="Alice")
+        result = get_my_queue_cases(engineer_filter="Alice")
         assert "10000001" not in result
 
     def test_null_assignee_returned_without_filter(self, test_db_session):
@@ -501,6 +501,6 @@ class TestGetEngineeringCasesEdgeCases:
             ],
         )
 
-        result = get_engineering_cases()
+        result = get_my_queue_cases()
         case = result["10000001"]
         assert case["field_engineer"] is None

@@ -122,6 +122,8 @@ class JiraCard(Base):
         assignee: JIRA username of assignee
         sprint: Sprint name or identifier
         severity: Severity level as integer (1-4)
+        no_update_date: When the case was last marked "no update needed"
+            (nullable; used to drop the case from the My Queue view)
         case: Relationship to parent Case record
         comments: Relationship to JiraComment records
     """
@@ -153,6 +155,9 @@ class JiraCard(Base):
     severity: Mapped[Optional[int]] = mapped_column(
         Integer, nullable=True
     )  # Made nullable since it might not always be available
+    no_update_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True
+    )  # Set when the case is marked "no update needed"; excludes it from view
 
     __table_args__ = (
         ForeignKeyConstraint(

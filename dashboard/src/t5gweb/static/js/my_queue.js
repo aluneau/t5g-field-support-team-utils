@@ -1,4 +1,4 @@
-// Engineering View DataTable initialization
+// My Queue DataTable initialization
 /* globals $ */ // eslint-disable-line no-redeclare
 
 /**
@@ -70,12 +70,12 @@ function format (data) {
 
 // Initialize DataTable
 $(document).ready(function () {
-  console.log('Engineering view: DOM ready')
+  console.log('My Queue: DOM ready')
 
   // Check if table exists
-  const tableElement = $('#engineering-data')
+  const tableElement = $('#my-queue-data')
   if (tableElement.length === 0) {
-    console.error('Engineering table #engineering-data not found!')
+    console.error('My Queue table #my-queue-data not found!')
     return
   }
 
@@ -123,7 +123,7 @@ $(document).ready(function () {
   let table
   try {
     console.log('Initializing DataTable...')
-    table = $('#engineering-data').DataTable(options)
+    table = $('#my-queue-data').DataTable(options)
     console.log('DataTable initialized successfully')
   } catch (error) {
     console.error('DataTable initialization error:', error)
@@ -132,7 +132,7 @@ $(document).ready(function () {
   }
 
   // Add event listener for opening and closing details
-  $('#engineering-data').on('click', 'td.dt-control', function () {
+  $('#my-queue-data').on('click', 'td.dt-control', function () {
     const tr = $(this).closest('tr')
     const row = table.row(tr)
 
@@ -150,7 +150,7 @@ $(document).ready(function () {
 
       // Fetch comments from API
       $.ajax({
-        url: '/api/engineering/case/' + caseNumber + '/comments',
+        url: '/api/my-queue/case/' + caseNumber + '/comments',
         method: 'GET',
         success: function (data) {
           row.child(format(data)).show()
