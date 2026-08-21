@@ -118,10 +118,15 @@ def get_board_id(conn, name):
 
 
 def get_previous_card(conn, cfg, case):
-    """Find the first existing JIRA card associated with a case number
+    """Find the existing JIRA card whose summary is for this case number
 
-    Searches for JIRA issues in the configured project that have the case
-    number in their summary field.
+    Cards are titled "<8-digit case number>: <title>", so the owning case is
+    the prefix before the first colon. The JQL ``summary ~`` operator matches
+    the case number anywhere in the summary, which wrongly matches cards that
+    merely mention another case in their title (e.g. a log-collection companion
+    card). To avoid reopening the wrong card, the JQL is used only as a coarse
+    filter and the summary prefix is matched exactly, the same way the cache
+    keys cards (see cache._build_card_data).
 
     Args:
         conn: JIRA connection object
@@ -129,14 +134,16 @@ def get_previous_card(conn, cfg, case):
         case: Case number to search for
 
     Returns:
-        Issue: First matching JIRA issue object, or None if no match found
+        Issue: Matching JIRA issue object whose summary prefix is the case
+            number, or None if no match found
     """
     previous_issues_query = f"project = {cfg['project']} AND summary ~ '{case}'"
     previous_issues = conn.search_issues(
         previous_issues_query, 0, cfg["max_jira_results"]
     )
-    if len(previous_issues) > 0:
-        return previous_issues[0]
+    for issue in previous_issues:
+        if issue.fields.summary.split(":")[0].strip() == case:
+            return issue
     return None
 
 
