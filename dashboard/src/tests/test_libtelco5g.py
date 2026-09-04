@@ -1,13 +1,21 @@
+import types
+
 import pytest
 
 from t5gweb.libtelco5g import (
     _assign_cases_batch,
     get_case_number,
+    get_previous_card,
     is_bug_missing_target,
     jira_connection,
     redis_get,
     redis_set,
 )
+
+
+def _fake_issue(key, summary):
+    """Build a minimal stand-in for a JIRA issue with a summary field."""
+    return types.SimpleNamespace(key=key, fields=types.SimpleNamespace(summary=summary))
 
 
 def test_get_jira_connection(mocker):
@@ -83,6 +91,67 @@ def test_get_case_number(link, pfilter, expected_case_number):
 def test_is_bug_missing_target(item, expected_result):
     result = is_bug_missing_target(item)
     assert result == expected_result
+
+
+# --- get_previous_card tests ---
+
+
+@pytest.fixture
+def previous_card_cfg():
+    return {"project": "TESTPROJ", "max_jira_results": 100}
+
+
+def test_get_previous_card_matches_summary_prefix(mocker, previous_card_cfg):
+    """Returns the card whose summary starts with the case number."""
+    conn = mocker.Mock()
+    conn.search_issues.return_value = [
+        _fake_issue("TESTPROJ-1", "11111111: example issue"),
+    ]
+
+    result = get_previous_card(conn, previous_card_cfg, "11111111")
+
+    assert result.key == "TESTPROJ-1"
+
+
+def test_get_previous_card_skips_companion_card_mentioning_case(
+    mocker, previous_card_cfg
+):
+    """A card that only mentions the case in its title is not the owner.
+
+    Reproduces the hourly-reopen loop: the fuzzy JQL returns the companion
+    card (whose title mentions another case number) first, but the real owner
+    is the card whose summary prefix is the case number.
+    """
+    conn = mocker.Mock()
+    conn.search_issues.return_value = [
+        _fake_issue("TESTPROJ-100", "22222222: logs related to case 33333333"),
+        _fake_issue("TESTPROJ-200", "33333333: original issue"),
+    ]
+
+    result = get_previous_card(conn, previous_card_cfg, "33333333")
+
+    assert result.key == "TESTPROJ-200"
+
+
+def test_get_previous_card_returns_none_without_prefix_match(mocker, previous_card_cfg):
+    """Only a title mention (no summary-prefix owner) yields no match."""
+    conn = mocker.Mock()
+    conn.search_issues.return_value = [
+        _fake_issue("TESTPROJ-100", "22222222: logs related to case 33333333"),
+    ]
+
+    result = get_previous_card(conn, previous_card_cfg, "33333333")
+
+    assert result is None
+
+
+def test_get_previous_card_returns_none_when_no_results(mocker, previous_card_cfg):
+    conn = mocker.Mock()
+    conn.search_issues.return_value = []
+
+    result = get_previous_card(conn, previous_card_cfg, "11111111")
+
+    assert result is None
 
 
 # --- _assign_cases_batch tests ---
